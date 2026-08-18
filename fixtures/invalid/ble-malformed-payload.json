@@ -1,0 +1,6 @@
+{
+  "format": "ble-gatt-blood-pressure",
+  "bytes": "00 12",
+  "patientRef": "Patient/synthetic-p-101",
+  "_comment": "Truncated Blood Pressure GATT payload (only 2 bytes provided; minimum 7 required)"
+}

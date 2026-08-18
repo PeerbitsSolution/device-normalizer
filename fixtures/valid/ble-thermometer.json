@@ -1,0 +1,7 @@
+{
+  "format": "ble-gatt-thermometer",
+  "bytes": "00 72 01 00 FF",
+  "patientRef": "Patient/synthetic-p-101",
+  "deviceId": "Device/ble-kore-temp-001",
+  "_comment": "Synthetic Bluetooth SIG 0x2A1C payload: 37.0 degC (370 * 10^-1)"
+}

@@ -1,0 +1,7 @@
+{
+  "format": "ble-gatt-glucose",
+  "bytes": "00 01 00 EA 07 08 01 0A 00 00 5F 00",
+  "patientRef": "Patient/synthetic-p-101",
+  "deviceId": "Device/ble-contour-glu-001",
+  "_comment": "Synthetic Bluetooth SIG 0x2A18 payload: 95 mg/dL glucose reading"
+}

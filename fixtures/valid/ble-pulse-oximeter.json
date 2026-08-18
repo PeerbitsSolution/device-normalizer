@@ -1,0 +1,7 @@
+{
+  "format": "ble-gatt-pulse-oximeter",
+  "bytes": "00 62 00 48 00",
+  "patientRef": "Patient/synthetic-p-101",
+  "deviceId": "Device/ble-masimo-spo2-001",
+  "_comment": "Synthetic Bluetooth SIG 0x2A5E/0x2A5F payload: 98% SpO2 and 72 bpm Pulse Rate"
+}

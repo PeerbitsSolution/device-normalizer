@@ -1,0 +1,7 @@
+{
+  "format": "ble-gatt-weight-scale",
+  "bytes": "00 98 3A",
+  "patientRef": "Patient/synthetic-p-101",
+  "deviceId": "Device/ble-scale-001",
+  "_comment": "Synthetic Bluetooth SIG 0x2A98 payload: 75.0 kg (raw 15000 * 0.005 resolution)"
+}

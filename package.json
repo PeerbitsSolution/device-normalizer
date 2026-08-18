@@ -1,0 +1,59 @@
+{
+  "name": "@peerbits/device-normalizer",
+  "version": "1.0.0",
+  "description": "Normalizes raw device/health-platform payloads (Bluetooth GATT health profiles, Apple HealthKit, generic JSON) into canonical vital readings for fhir-observation-generator",
+  "license": "Apache-2.0",
+  "author": "PeerbitsSolution",
+  "homepage": "https://github.com/PeerbitsSolution/device-normalizer#readme",
+  "bugs": {
+    "url": "https://github.com/PeerbitsSolution/device-normalizer/issues"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepack": "npm run build && npm run typecheck && npm test",
+    "prepublishOnly": "npm run lint && npm run prepack"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PeerbitsSolution/device-normalizer.git"
+  },
+  "keywords": [
+    "rpm",
+    "remote-patient-monitoring",
+    "bluetooth-gatt",
+    "healthkit",
+    "healthcare",
+    "typescript",
+    "loinc",
+    "fhir"
+  ],
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

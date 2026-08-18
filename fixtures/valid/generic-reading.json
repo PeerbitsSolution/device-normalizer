@@ -1,0 +1,9 @@
+{
+  "format": "generic-json",
+  "deviceType": "heart-rate",
+  "rawValue": 76,
+  "rawUnit": "bpm",
+  "timestamp": "2026-08-15T09:00:00.000Z",
+  "patientRef": "Patient/synthetic-p-101",
+  "deviceId": "Device/generic-sensor-001"
+}

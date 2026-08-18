@@ -1,0 +1,7 @@
+{
+  "format": "ble-gatt-blood-pressure",
+  "bytes": "00 78 00 50 00 5D 00",
+  "patientRef": "Patient/synthetic-p-101",
+  "deviceId": "Device/ble-omron-bp-001",
+  "_comment": "Synthetic Bluetooth SIG 0x2A35 payload: 120/80 mmHg with MAP 93 mmHg"
+}

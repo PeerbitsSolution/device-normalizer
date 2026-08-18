@@ -1,0 +1,9 @@
+# Global code owners
+*                           @PeerbitsSolution/healthtech-oss
+
+# Byte-layout decoders and public format specifications
+/src/adapters/ble-gatt/     @PeerbitsSolution/healthtech-oss
+/src/adapters/healthkit.ts  @PeerbitsSolution/healthtech-oss
+/docs/SUPPORTED_FORMATS.md  @PeerbitsSolution/healthtech-oss
+README.md                   @PeerbitsSolution/healthtech-oss
+SECURITY.md                 @PeerbitsSolution/healthtech-oss

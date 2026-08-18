@@ -1,0 +1,22 @@
+{
+  "format": "healthkit",
+  "correlationType": "HKCorrelationTypeIdentifierBloodPressure",
+  "startDate": "2026-08-15T08:30:00.000Z",
+  "endDate": "2026-08-15T08:30:00.000Z",
+  "patientRef": "Patient/synthetic-p-101",
+  "deviceId": "Device/apple-watch-s9-001",
+  "objects": [
+    {
+      "sampleType": "HKQuantityTypeIdentifierBloodPressureSystolic",
+      "value": 118,
+      "unit": "mmHg",
+      "startDate": "2026-08-15T08:30:00.000Z"
+    },
+    {
+      "sampleType": "HKQuantityTypeIdentifierBloodPressureDiastolic",
+      "value": 78,
+      "unit": "mmHg",
+      "startDate": "2026-08-15T08:30:00.000Z"
+    }
+  ]
+}
