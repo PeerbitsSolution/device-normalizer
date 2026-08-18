@@ -4,7 +4,7 @@ import { bleThermometerAdapter } from "../src/adapters/ble-gatt/thermometer.js";
 import { blePulseOximeterAdapter } from "../src/adapters/ble-gatt/pulse-oximeter.js";
 import { bleWeightScaleAdapter } from "../src/adapters/ble-gatt/weight-scale.js";
 import { bleGlucoseAdapter } from "../src/adapters/ble-gatt/glucose.js";
-import { parseSFloat16, parseFloat32 } from "../src/adapters/ble-gatt/sfloat.js";
+import { BloodPressureValue } from "../src/types.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -37,8 +37,8 @@ describe("device-normalizer: BLE GATT adapters", () => {
 
     expect(reading.deviceType).toBe("blood-pressure");
     expect(reading.unit).toBe("kPa");
-    expect((reading.value as any).systolic).toBe(16);
-    expect((reading.value as any).diastolic).toBe(10.7);
+    expect((reading.value as BloodPressureValue).systolic).toBe(16);
+    expect((reading.value as BloodPressureValue).diastolic).toBe(10.7);
     expect(reading.metadata?.pulseRate).toBe(72);
   });
 

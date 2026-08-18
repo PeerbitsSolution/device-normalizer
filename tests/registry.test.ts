@@ -4,9 +4,8 @@ import {
   getSupportedFormats,
   getRegisteredAdapters,
   UnsupportedFormatError,
-  NormalizationValidationError,
 } from "../src/registry.js";
-import { genericJsonAdapter } from "../src/adapters/generic-json.js";
+import { DeviceReading, BloodPressureValue } from "../src/types.js";
 
 describe("device-normalizer: format registry", () => {
   it("returns all supported format identifiers and descriptions", () => {
@@ -25,11 +24,12 @@ describe("device-normalizer: format registry", () => {
 
   it("dispatches to the correct adapter per declared format", () => {
     const rawGattHex = "00 78 00 50 00 5D 00";
-    const res = normalize("ble-gatt-blood-pressure", { bytes: rawGattHex }) as any;
+    const res = normalize("ble-gatt-blood-pressure", { bytes: rawGattHex }) as DeviceReading;
+    const value = res.value as BloodPressureValue;
 
     expect(res.deviceType).toBe("blood-pressure");
-    expect(res.value.systolic).toBe(120);
-    expect(res.value.diastolic).toBe(80);
+    expect(value.systolic).toBe(120);
+    expect(value.diastolic).toBe(80);
   });
 
   it("produces a clear typed error for an unknown format", () => {
@@ -44,7 +44,7 @@ describe("device-normalizer: format registry", () => {
       patientRef: "Patient/p-123",
     };
 
-    const res = normalize("generic-json", payload) as any;
+    const res = normalize("generic-json", payload) as DeviceReading;
     expect(res.deviceType).toBe("heart-rate");
     expect(res.value).toBe(72);
     expect(res.unit).toBe("bpm");

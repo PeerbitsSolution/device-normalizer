@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { healthKitAdapter, normalizeHealthKitType, normalizeHealthKitUnit } from "../src/adapters/healthkit.js";
-import { HealthKitSamplePayload } from "../src/types.js";
+import { healthKitAdapter } from "../src/adapters/healthkit.js";
+import { HealthKitSamplePayload, DeviceReading } from "../src/types.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -9,7 +9,7 @@ describe("device-normalizer: HealthKit adapter", () => {
 
   it("parses Blood Pressure correlation sample pair correctly", () => {
     const fixture = JSON.parse(fs.readFileSync(path.join(validDir, "healthkit-sample.json"), "utf-8"));
-    const reading = healthKitAdapter.normalize(fixture) as any;
+    const reading = healthKitAdapter.normalize(fixture) as DeviceReading;
 
     expect(reading.deviceType).toBe("blood-pressure");
     expect(reading.value).toEqual({
@@ -61,7 +61,7 @@ describe("device-normalizer: HealthKit adapter", () => {
       },
     ];
 
-    const results = healthKitAdapter.normalize(samples) as any[];
+    const results = healthKitAdapter.normalize(samples) as DeviceReading[];
     expect(results).toHaveLength(6);
 
     expect(results[0].deviceType).toBe("heart-rate");

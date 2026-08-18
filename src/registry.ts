@@ -43,10 +43,12 @@ export class NormalizationValidationError extends Error {
   }
 }
 
-// Internal registry map
+// Internal registry map.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- adapters have heterogeneous payload types; erased to `any` at registration
 const ADAPTER_REGISTRY = new Map<SupportedFormat, NormalizerAdapter<any>>();
 
 // Register built-in standards-based adapters
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- see ADAPTER_REGISTRY note above
 export function registerAdapter(adapter: NormalizerAdapter<any>): void {
   ADAPTER_REGISTRY.set(adapter.format, adapter);
 }
