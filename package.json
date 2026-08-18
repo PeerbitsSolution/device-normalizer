@@ -1,6 +1,6 @@
 {
   "name": "@peerbits/device-normalizer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Normalizes raw device/health-platform payloads (Bluetooth GATT health profiles, Apple HealthKit, generic JSON) into canonical vital readings for fhir-observation-generator",
   "license": "Apache-2.0",
   "author": "PeerbitsSolution",
