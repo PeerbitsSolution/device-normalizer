@@ -43,7 +43,11 @@ npm install @peerbits/device-normalizer
 
 ---
 
-## 4. Quick Start
+## 4. Demo and Quick Start
+
+
+[Peerbits HealthTech - Device Normalizer Demo](https://healthcare.peerbits.com/demo/device-normalizer)
+
 
 ```ts
 import { normalize } from "@peerbits/device-normalizer";
