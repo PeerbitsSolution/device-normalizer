@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   normalize,
+  process,
   getSupportedFormats,
   getRegisteredAdapters,
   UnsupportedFormatError,
@@ -24,7 +25,7 @@ describe("device-normalizer: format registry", () => {
 
   it("dispatches to the correct adapter per declared format", () => {
     const rawGattHex = "00 78 00 50 00 5D 00";
-    const res = normalize("ble-gatt-blood-pressure", { bytes: rawGattHex }) as DeviceReading;
+    const res = normalize("ble-gatt-blood-pressure", { bytes: rawGattHex }, { receivedAt: "2026-08-15T10:00:00Z" }) as DeviceReading;
     const value = res.value as BloodPressureValue;
 
     expect(res.deviceType).toBe("blood-pressure");
@@ -41,13 +42,26 @@ describe("device-normalizer: format registry", () => {
       deviceType: "heart-rate",
       rawValue: 72,
       rawUnit: "bpm",
+      timestamp: "2026-08-15T10:00:00Z",
       patientRef: "Patient/p-123",
     };
 
     const res = normalize("generic-json", payload) as DeviceReading;
     expect(res.deviceType).toBe("heart-rate");
     expect(res.value).toBe(72);
-    expect(res.unit).toBe("bpm");
+    expect(res.unit).toBe("/min");
     expect(res.patientRef).toBe("Patient/p-123");
+  });
+
+  it("automatically detects HealthKit payloads", () => {
+    const result = process({
+      sampleType: "HKQuantityTypeIdentifierHeartRate",
+      value: 72,
+      unit: "count/min",
+      startDate: "2026-08-15T10:00:00Z",
+    }) as DeviceReading;
+    expect(result.deviceType).toBe("heart-rate");
+    expect(result.source.provider).toBe("apple-healthkit");
+    expect(result.schemaVersion).toBe("2.0.0");
   });
 });

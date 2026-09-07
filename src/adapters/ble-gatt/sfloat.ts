@@ -24,6 +24,9 @@ export function payloadToDataView(raw: Uint8Array | number[] | string): DataView
       bytes[i / 2] = parseInt(stripped.substring(i, i + 2), 16);
     }
   } else if (Array.isArray(raw)) {
+    if (raw.length === 0 || raw.some((value) => !Number.isInteger(value) || value < 0 || value > 255)) {
+      throw new Error("Invalid byte array: every value must be an integer from 0 to 255");
+    }
     bytes = new Uint8Array(raw);
   } else if (raw instanceof Uint8Array) {
     bytes = raw;
@@ -123,9 +126,9 @@ export function parseFloat32(view: DataView, offset: number, littleEndian: boole
  * Parses Bluetooth SIG standard 7-byte Date-Time structure into an ISO 8601 string.
  * Year (UINT16), Month (UINT8), Day (UINT8), Hours (UINT8), Minutes (UINT8), Seconds (UINT8).
  */
-export function parseBleDateTime(view: DataView, offset: number): { iso: string; bytesRead: number } {
+export function parseBleDateTime(view: DataView, offset: number, timezoneOffsetMinutes?: number): { iso?: string; bytesRead: number } {
   if (offset + 7 > view.byteLength) {
-    return { iso: new Date().toISOString(), bytesRead: 0 };
+    throw new Error(`Cannot read BLE Date-Time at offset ${offset}: payload length is ${view.byteLength}`);
   }
 
   const year = view.getUint16(offset, true);
@@ -136,16 +139,15 @@ export function parseBleDateTime(view: DataView, offset: number): { iso: string;
   const seconds = view.getUint8(offset + 6);
 
   if (year === 0 || month === 0 || day === 0) {
-    return { iso: new Date().toISOString(), bytesRead: 7 };
+    return { bytesRead: 7 };
   }
-
-  const yyyy = String(year).padStart(4, "0");
-  const MM = String(month).padStart(2, "0");
-  const dd = String(day).padStart(2, "0");
-  const hh = String(hours).padStart(2, "0");
-  const mm = String(minutes).padStart(2, "0");
-  const ss = String(seconds).padStart(2, "0");
-
-  const iso = `${yyyy}-${MM}-${dd}T${hh}:${mm}:${ss}.000Z`;
-  return { iso, bytesRead: 7 };
+  const local = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
+  if (local.getUTCFullYear() !== year || local.getUTCMonth() !== month - 1 || local.getUTCDate() !== day ||
+      local.getUTCHours() !== hours || local.getUTCMinutes() !== minutes || local.getUTCSeconds() !== seconds) {
+    throw new Error("Invalid BLE Date-Time field");
+  }
+  if (!Number.isInteger(timezoneOffsetMinutes) || Math.abs(timezoneOffsetMinutes as number) > 14 * 60) {
+    throw new Error("BLE Date-Time has no timezone; supply timezoneOffsetMinutes with the payload");
+  }
+  return { iso: new Date(local.getTime() - (timezoneOffsetMinutes as number) * 60_000).toISOString(), bytesRead: 7 };
 }

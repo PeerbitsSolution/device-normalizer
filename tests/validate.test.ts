@@ -5,11 +5,20 @@ import { DeviceReading } from "../src/types.js";
 describe("device-normalizer: structural self-check", () => {
   it("confirms valid DeviceReading satisfies fhir-observation-generator requirements", () => {
     const validReading: DeviceReading = {
+      schemaVersion: "2.0.0",
       deviceType: "blood-pressure",
       value: { systolic: 120, diastolic: 80 },
       unit: "mmHg",
+      metrics: {
+        systolic: { value: 120, unit: "mmHg" },
+        diastolic: { value: 80, unit: "mmHg" },
+      },
       timestamp: "2026-08-15T10:00:00Z",
       patientRef: "Patient/synthetic-p-001",
+      source: {
+        provider: "test", format: "generic-json", detectionConfidence: 1,
+        transmissionType: "manual", adapterVersion: "2.0.0",
+      },
     };
 
     const res = validateDeviceReading(validReading);
@@ -30,7 +39,7 @@ describe("device-normalizer: structural self-check", () => {
     expect(res.valid).toBe(false);
     expect(res.errors).toEqual(
       expect.arrayContaining([
-        expect.stringContaining("Missing required 'patientRef'"),
+        expect.stringContaining("schemaVersion"),
         expect.stringContaining("Invalid timestamp format"),
       ])
     );
@@ -47,6 +56,6 @@ describe("device-normalizer: structural self-check", () => {
 
     const res = validateDeviceReading(invalidBp);
     expect(res.valid).toBe(false);
-    expect(res.errors[0]).toContain("Blood pressure value must be an object");
+    expect(res.errors).toEqual(expect.arrayContaining([expect.stringContaining("Blood pressure value must be an object")]));
   });
 });

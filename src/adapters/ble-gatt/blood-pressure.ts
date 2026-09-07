@@ -4,7 +4,9 @@
  * Grounded in Bluetooth SIG Blood Pressure Profile Specification (v1.1.1).
  */
 
-import { DeviceReading, NormalizerAdapter, NormalizerOptions, BleRawPayload } from "../../types.js";
+import { AdapterReading, NormalizerAdapter, NormalizerOptions, BleRawPayload } from "../../types.js";
+import { requireTimestamp } from "../../helpers.js";
+import { normalizeBloodPressure } from "../../units.js";
 import { payloadToDataView, parseSFloat16, parseBleDateTime } from "./sfloat.js";
 
 export const bleBloodPressureAdapter: NormalizerAdapter<BleRawPayload | Uint8Array | number[] | string> = {
@@ -12,11 +14,17 @@ export const bleBloodPressureAdapter: NormalizerAdapter<BleRawPayload | Uint8Arr
   displayName: "Bluetooth SIG Blood Pressure Profile (0x2A35)",
   description: "Decodes GATT Blood Pressure Measurement characteristic into canonical blood pressure DeviceReading",
 
-  normalize(rawInput, options?: NormalizerOptions): DeviceReading {
+  detect(payload) {
+    if (!payload || typeof payload !== "object" || !("characteristicUuid" in payload)) return null;
+    const uuid = String((payload as { characteristicUuid?: unknown }).characteristicUuid).toLowerCase().replace(/^0x/, "");
+    return uuid === "2a35" ? { format: this.format, provider: "bluetooth-sig", confidence: 1, transmissionType: "bluetooth", reason: "Blood Pressure characteristic UUID" } : null;
+  },
+  normalize(rawInput, options?: NormalizerOptions): AdapterReading {
     let rawBytes: Uint8Array | number[] | string;
-    let patientRef = options?.defaultPatientRef || "Patient/unknown";
+    let patientRef = options?.defaultPatientRef;
     let deviceId = options?.defaultDeviceId;
-    let fallbackTimestamp = new Date().toISOString();
+    let fallbackTimestamp = options?.receivedAt;
+    let timezoneOffsetMinutes: number | undefined;
 
     if (typeof rawInput === "object" && rawInput !== null && "bytes" in rawInput) {
       const payload = rawInput as BleRawPayload;
@@ -24,6 +32,7 @@ export const bleBloodPressureAdapter: NormalizerAdapter<BleRawPayload | Uint8Arr
       if (payload.patientRef) patientRef = payload.patientRef;
       if (payload.deviceId) deviceId = payload.deviceId;
       if (payload.timestamp) fallbackTimestamp = payload.timestamp;
+      timezoneOffsetMinutes = payload.timezoneOffsetMinutes;
     } else {
       rawBytes = rawInput as Uint8Array | number[] | string;
     }
@@ -40,7 +49,7 @@ export const bleBloodPressureAdapter: NormalizerAdapter<BleRawPayload | Uint8Arr
     const hasUserId = (flags & 0x08) !== 0;
     const hasStatus = (flags & 0x10) !== 0;
 
-    const unit = isKPa ? "kPa" : "mmHg";
+    const rawUnit = isKPa ? "kPa" : "mmHg";
 
     let offset = 1;
     const systolic = parseSFloat16(view, offset);
@@ -50,9 +59,9 @@ export const bleBloodPressureAdapter: NormalizerAdapter<BleRawPayload | Uint8Arr
     const map = parseSFloat16(view, offset);
     offset += 2;
 
-    let timestamp = fallbackTimestamp;
+    let timestamp: string | undefined = fallbackTimestamp;
     if (hasTimestamp && offset + 7 <= view.byteLength) {
-      const dt = parseBleDateTime(view, offset);
+      const dt = parseBleDateTime(view, offset, timezoneOffsetMinutes);
       timestamp = dt.iso;
       offset += dt.bytesRead;
     }
@@ -77,20 +86,25 @@ export const bleBloodPressureAdapter: NormalizerAdapter<BleRawPayload | Uint8Arr
 
     const metadata: Record<string, unknown> = {
       bleProfile: "0x2A35",
-      meanArterialPressure: map,
+      meanArterialPressure: normalizeBloodPressure(map, rawUnit),
     };
     if (pulseRate !== undefined) metadata.pulseRate = pulseRate;
     if (userId !== undefined) metadata.userId = userId;
     if (measurementStatus !== undefined) metadata.measurementStatus = measurementStatus;
 
+    const value = {
+      systolic: normalizeBloodPressure(systolic, rawUnit),
+      diastolic: normalizeBloodPressure(diastolic, rawUnit),
+      meanArterialPressure: normalizeBloodPressure(map, rawUnit),
+      ...(pulseRate === undefined ? {} : { pulse: pulseRate }),
+    };
+
     return {
       deviceType: "blood-pressure",
-      value: {
-        systolic,
-        diastolic,
-      },
-      unit,
-      timestamp,
+      value,
+      unit: "mm[Hg]",
+      timestamp: requireTimestamp(timestamp, options),
+      timezoneOffsetMinutes,
       patientRef,
       deviceId,
       metadata,

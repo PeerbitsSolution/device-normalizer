@@ -32,6 +32,19 @@ export function validateDeviceReading(reading: unknown): ValidationResult {
     );
   }
 
+  if (r.schemaVersion !== "2.0.0") errors.push("Missing or unsupported 'schemaVersion'");
+  if (!r.source || typeof r.source.provider !== "string" || !r.source.provider) {
+    errors.push("Missing required source provenance");
+  }
+  if (!r.metrics || typeof r.metrics !== "object") errors.push("Missing required canonical metrics");
+  else {
+    for (const [key, metric] of Object.entries(r.metrics)) {
+      if (!metric || typeof metric.value !== "number" || !Number.isFinite(metric.value) || typeof metric.unit !== "string" || !metric.unit.trim()) {
+        errors.push(`Invalid canonical metric '${key}'`);
+      }
+    }
+  }
+
   // 2. Check value
   if (r.value === undefined || r.value === null) {
     errors.push("Missing required 'value' field");
@@ -49,6 +62,10 @@ export function validateDeviceReading(reading: unknown): ValidationResult {
       if (typeof bp.systolic === "number" && typeof bp.diastolic === "number" && bp.systolic <= bp.diastolic) {
         errors.push(`Suspicious blood pressure values: systolic (${bp.systolic}) is <= diastolic (${bp.diastolic})`);
       }
+    }
+  } else if (["body-composition", "continuous-glucose", "spirometry", "sleep", "ecg"].includes(r.deviceType ?? "")) {
+    if (typeof r.value !== "object" || r.value === null || Array.isArray(r.value)) {
+      errors.push(`Reading value for ${r.deviceType} must be an object`);
     }
   } else {
     if (typeof r.value !== "number" || isNaN(r.value)) {
@@ -69,11 +86,12 @@ export function validateDeviceReading(reading: unknown): ValidationResult {
     if (isNaN(parsedDate.getTime())) {
       errors.push(`Invalid timestamp format: "${r.timestamp}". Expected ISO 8601 string.`);
     }
+    if (!/(?:Z|[+-]\d{2}:?\d{2})$/i.test(r.timestamp)) errors.push("Timestamp must include a UTC offset");
   }
 
-  // 5. Check patientRef
-  if (!r.patientRef || typeof r.patientRef !== "string" || !r.patientRef.trim()) {
-    errors.push("Missing required 'patientRef' field");
+  // 5. Patient matching may happen downstream, but a supplied reference must be usable.
+  if (r.patientRef !== undefined && (typeof r.patientRef !== "string" || !r.patientRef.trim())) {
+    errors.push("'patientRef' must be a non-empty string when supplied");
   }
 
   return {

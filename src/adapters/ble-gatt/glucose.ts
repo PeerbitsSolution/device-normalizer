@@ -4,7 +4,9 @@
  * Grounded in Bluetooth SIG Glucose Profile Specification (v1.0).
  */
 
-import { DeviceReading, NormalizerAdapter, NormalizerOptions, BleRawPayload } from "../../types.js";
+import { AdapterReading, NormalizerAdapter, NormalizerOptions, BleRawPayload } from "../../types.js";
+import { requireTimestamp } from "../../helpers.js";
+import { normalizeScalarUnit } from "../../units.js";
 import { payloadToDataView, parseSFloat16, parseBleDateTime } from "./sfloat.js";
 
 export const bleGlucoseAdapter: NormalizerAdapter<BleRawPayload | Uint8Array | number[] | string> = {
@@ -12,11 +14,17 @@ export const bleGlucoseAdapter: NormalizerAdapter<BleRawPayload | Uint8Array | n
   displayName: "Bluetooth SIG Glucose Profile (0x2A18)",
   description: "Decodes GATT Glucose Measurement characteristic into canonical glucose DeviceReading",
 
-  normalize(rawInput, options?: NormalizerOptions): DeviceReading {
+  detect(payload) {
+    if (!payload || typeof payload !== "object" || !("characteristicUuid" in payload)) return null;
+    const uuid = String((payload as { characteristicUuid?: unknown }).characteristicUuid).toLowerCase().replace(/^0x/, "");
+    return uuid === "2a18" ? { format: this.format, provider: "bluetooth-sig", confidence: 1, transmissionType: "bluetooth", reason: "Glucose characteristic UUID" } : null;
+  },
+  normalize(rawInput, options?: NormalizerOptions): AdapterReading {
     let rawBytes: Uint8Array | number[] | string;
-    let patientRef = options?.defaultPatientRef || "Patient/unknown";
+    let patientRef = options?.defaultPatientRef;
     let deviceId = options?.defaultDeviceId;
-    let fallbackTimestamp = new Date().toISOString();
+    let fallbackTimestamp = options?.receivedAt;
+    let timezoneOffsetMinutes: number | undefined;
 
     if (typeof rawInput === "object" && rawInput !== null && "bytes" in rawInput) {
       const payload = rawInput as BleRawPayload;
@@ -24,6 +32,7 @@ export const bleGlucoseAdapter: NormalizerAdapter<BleRawPayload | Uint8Array | n
       if (payload.patientRef) patientRef = payload.patientRef;
       if (payload.deviceId) deviceId = payload.deviceId;
       if (payload.timestamp) fallbackTimestamp = payload.timestamp;
+      timezoneOffsetMinutes = payload.timezoneOffsetMinutes;
     } else {
       rawBytes = rawInput as Uint8Array | number[] | string;
     }
@@ -42,7 +51,7 @@ export const bleGlucoseAdapter: NormalizerAdapter<BleRawPayload | Uint8Array | n
     const sequenceNumber = view.getUint16(1, true);
 
     let offset = 3;
-    const baseTime = parseBleDateTime(view, offset);
+    const baseTime = parseBleDateTime(view, offset, timezoneOffsetMinutes);
     let timestamp = baseTime.iso || fallbackTimestamp;
     offset += 7;
 
@@ -51,8 +60,8 @@ export const bleGlucoseAdapter: NormalizerAdapter<BleRawPayload | Uint8Array | n
       timeOffsetMinutes = view.getInt16(offset, true);
       offset += 2;
       // Adjust timestamp if time offset present
-      const baseDate = new Date(timestamp);
-      if (!isNaN(baseDate.getTime()) && timeOffsetMinutes !== 0) {
+      const baseDate = timestamp ? new Date(timestamp) : null;
+      if (baseDate && !isNaN(baseDate.getTime()) && timeOffsetMinutes !== 0) {
         timestamp = new Date(baseDate.getTime() + timeOffsetMinutes * 60 * 1000).toISOString();
       }
     }
@@ -102,11 +111,13 @@ export const bleGlucoseAdapter: NormalizerAdapter<BleRawPayload | Uint8Array | n
     if (sampleLocation !== undefined) metadata.sampleLocation = sampleLocation;
     if (sensorStatus !== undefined) metadata.sensorStatus = sensorStatus;
 
+    const normalized = normalizeScalarUnit("glucose", glucoseRaw, unit);
     return {
       deviceType: "glucose",
-      value: glucoseRaw,
-      unit,
-      timestamp,
+      value: normalized.value,
+      unit: normalized.unit,
+      timestamp: requireTimestamp(timestamp, options),
+      timezoneOffsetMinutes,
       patientRef,
       deviceId,
       metadata,

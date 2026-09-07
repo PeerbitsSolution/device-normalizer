@@ -5,12 +5,15 @@
  */
 
 import {
-  DeviceReading,
+  AdapterReading,
   NormalizerAdapter,
   NormalizerOptions,
   HealthKitSamplePayload,
   DeviceType,
 } from "../types.js";
+import { DeviceNormalizerError } from "../errors.js";
+import { requireTimestamp } from "../helpers.js";
+import { normalizeBloodPressure, normalizeScalarUnit } from "../units.js";
 
 /**
  * Standardizes HealthKit sample type identifier strings (handles short names or full HK identifiers).
@@ -135,9 +138,18 @@ export const healthKitAdapter: NormalizerAdapter<HealthKitSamplePayload | Health
   displayName: "Apple HealthKit Public Schema",
   description: "Parses Apple HealthKit sample JSON structures into canonical DeviceReadings",
 
-  normalize(rawInput, options?: NormalizerOptions): DeviceReading | DeviceReading[] {
+  detect(payload) {
+    const first = Array.isArray(payload) ? payload[0] : payload;
+    if (!first || typeof first !== "object") return null;
+    const type = String((first as { sampleType?: unknown; correlationType?: unknown }).sampleType ??
+      (first as { correlationType?: unknown }).correlationType ?? "");
+    if (!type.startsWith("HK")) return null;
+    return { format: this.format, provider: "apple-healthkit", confidence: 0.99, transmissionType: "healthkit", reason: "HealthKit type identifier" };
+  },
+
+  normalize(rawInput, options?: NormalizerOptions): AdapterReading | AdapterReading[] {
     if (Array.isArray(rawInput)) {
-      const readings: DeviceReading[] = [];
+      const readings: AdapterReading[] = [];
       for (const item of rawInput) {
         const res = healthKitAdapter.normalize(item, options);
         if (Array.isArray(res)) readings.push(...res);
@@ -151,15 +163,14 @@ export const healthKitAdapter: NormalizerAdapter<HealthKitSamplePayload | Health
     }
 
     const payload = rawInput as HealthKitSamplePayload;
-    const defaultPatientRef = options?.defaultPatientRef || payload.patientRef || "Patient/unknown";
+    const defaultPatientRef = options?.defaultPatientRef || payload.patientRef;
     const defaultDeviceId = options?.defaultDeviceId || payload.deviceId;
-    const timestamp = payload.startDate || payload.endDate || new Date().toISOString();
-
     const sampleType = payload.sampleType || payload.correlationType || "";
     const matchedType = normalizeHealthKitType(sampleType);
 
     // Handle Blood Pressure Correlation
     if (matchedType === "blood-pressure-correlation" || payload.objects) {
+      const timestamp = requireTimestamp(payload.startDate || payload.endDate, options);
       const objects = payload.objects || [];
       let systolicVal: number | undefined;
       let diastolicVal: number | undefined;
@@ -190,10 +201,10 @@ export const healthKitAdapter: NormalizerAdapter<HealthKitSamplePayload | Health
       return {
         deviceType: "blood-pressure",
         value: {
-          systolic: systolicVal,
-          diastolic: diastolicVal,
+          systolic: normalizeBloodPressure(systolicVal, bpUnit),
+          diastolic: normalizeBloodPressure(diastolicVal, bpUnit),
         },
-        unit: bpUnit,
+        unit: "mm[Hg]",
         timestamp,
         patientRef: defaultPatientRef,
         deviceId: defaultDeviceId,
@@ -209,19 +220,19 @@ export const healthKitAdapter: NormalizerAdapter<HealthKitSamplePayload | Health
       throw new Error(`Unsupported HealthKit sample type: "${sampleType}"`);
     }
 
-    let value = payload.value ?? 0;
-    let unit = normalizeHealthKitUnit(payload.unit, matchedType);
+    const timestamp = requireTimestamp(payload.startDate || payload.endDate, options);
 
-    // If SpO2 is given in ratio format (e.g. 0.98), normalize to percentage (98%)
-    if (matchedType === "spo2" && value > 0 && value <= 1.0) {
-      value = Math.round(value * 100 * 10) / 10;
-      unit = "%";
+    if (payload.value === undefined || !Number.isFinite(payload.value)) {
+      throw new DeviceNormalizerError("invalid_payload", `HealthKit ${sampleType} requires a finite numeric value.`);
     }
+    const value = payload.value;
+    let unit = normalizeHealthKitUnit(payload.unit, matchedType);
+    const normalized = normalizeScalarUnit(matchedType, value, unit);
 
     return {
       deviceType: matchedType,
-      value,
-      unit,
+      value: normalized.value,
+      unit: normalized.unit,
       timestamp,
       patientRef: defaultPatientRef,
       deviceId: defaultDeviceId,

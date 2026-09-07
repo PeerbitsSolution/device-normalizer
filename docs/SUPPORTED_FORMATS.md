@@ -17,6 +17,19 @@ All GATT decoders accept pre-decoded characteristic value byte arrays, `Uint8Arr
 | **Pulse Oximeter Profile** | `0x2A5E` (Spot-Check) / `0x2A5F` (Continuous) | IEEE-11073 16-bit SFLOAT SpO2 (%) and Pulse Rate (bpm); 7-byte Date-Time. |
 | **Weight Scale Profile** | `0x2A98` (Weight Measurement) | UINT16 Weight with 0.005 kg (SI) or 0.01 lb (Imperial) resolution; 7-byte Date-Time; User ID; BMI and Height. |
 | **Glucose Profile** | `0x2A18` (Glucose Measurement) | Sequence Number; Base Date-Time; Time Offset (minutes); SFLOAT Concentration in mg/dL (kg/L) or mmol/L (mol/L); Sample Type & Location; Sensor Status. |
+| **Heart Rate Profile** | `0x2A37` (Heart Rate Measurement) | UINT8/UINT16 heart rate, energy-expended field, and RR intervals. |
+| **Continuous Glucose Monitoring** | `0x2AA7` (CGM Measurement) | Multiple records, session-relative time, glucose, trend, quality, status annunciation, and optional E2E CRC validation. Requires session start and CGM feature context. |
+
+### Platform and aggregator payloads
+
+- Apple HealthKit documented sample identifiers.
+- Google Health Connect core vital record exports.
+- Junction/Vital documented timeseries webhook events.
+- Tenovi HWI measurement webhooks.
+- Validic stream measurement events.
+- Withings `getmeas` responses (after the app follows its notification callback).
+- iHealth Cloud blood-pressure webhooks.
+- Dexcom EGV API responses.
 
 ### Apple HealthKit Public Schema
 Parses HealthKit JSON sample exports across 7 core vital types:
@@ -38,6 +51,8 @@ For custom devices or pre-normalized backend payloads, accepts a flat JSON struc
 
 To maintain safety, privacy, and zero vendor lock-in, the following are strictly out of scope:
 - **Bluetooth Radio Communication**: Scanning, pairing, connecting, RSSI filtering, or reading GATT characteristics over the air.
-- **Vendor Cloud API Authentication**: OAuth login flows, cloud credential management, or HTTP polling against vendor proprietary clouds (e.g. Fitbit, Withings, Garmin cloud APIs).
+- **Vendor Cloud API Authentication**: OAuth login flows, cloud credential management, or HTTP polling against vendor clouds. Adapters only normalize the payload after the host app retrieves it.
 - **Undocumented / Reverse-Engineered Vendor Protocols**: If a protocol is not an open standard or publicly documented API specification, it is not supported.
 - **Real-Time BLE Streaming Stacks**: Batch/one-shot payload decoding only.
+- **Vendor Payload Guessing**: Direct OEM adapters require official schemas and sanitized fixtures before they are accepted.
+- **Direct Omron or Abbott/LibreView cloud ingestion**: no public payload contract has been verified. Use their BLE standard profiles, a supported aggregator, FHIR, or partner-provided schemas.

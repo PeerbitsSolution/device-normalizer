@@ -4,7 +4,9 @@
  * Grounded in Bluetooth SIG Health Thermometer Profile Specification (v1.0).
  */
 
-import { DeviceReading, NormalizerAdapter, NormalizerOptions, BleRawPayload } from "../../types.js";
+import { AdapterReading, NormalizerAdapter, NormalizerOptions, BleRawPayload } from "../../types.js";
+import { requireTimestamp } from "../../helpers.js";
+import { normalizeScalarUnit } from "../../units.js";
 import { payloadToDataView, parseFloat32, parseBleDateTime } from "./sfloat.js";
 
 const TEMP_TYPE_NAMES: Record<number, string> = {
@@ -24,11 +26,17 @@ export const bleThermometerAdapter: NormalizerAdapter<BleRawPayload | Uint8Array
   displayName: "Bluetooth SIG Health Thermometer Profile (0x2A1C)",
   description: "Decodes GATT Temperature Measurement characteristic into canonical temperature DeviceReading",
 
-  normalize(rawInput, options?: NormalizerOptions): DeviceReading {
+  detect(payload) {
+    if (!payload || typeof payload !== "object" || !("characteristicUuid" in payload)) return null;
+    const uuid = String((payload as { characteristicUuid?: unknown }).characteristicUuid).toLowerCase().replace(/^0x/, "");
+    return uuid === "2a1c" ? { format: this.format, provider: "bluetooth-sig", confidence: 1, transmissionType: "bluetooth", reason: "Temperature characteristic UUID" } : null;
+  },
+  normalize(rawInput, options?: NormalizerOptions): AdapterReading {
     let rawBytes: Uint8Array | number[] | string;
-    let patientRef = options?.defaultPatientRef || "Patient/unknown";
+    let patientRef = options?.defaultPatientRef;
     let deviceId = options?.defaultDeviceId;
-    let fallbackTimestamp = new Date().toISOString();
+    let fallbackTimestamp = options?.receivedAt;
+    let timezoneOffsetMinutes: number | undefined;
 
     if (typeof rawInput === "object" && rawInput !== null && "bytes" in rawInput) {
       const payload = rawInput as BleRawPayload;
@@ -36,6 +44,7 @@ export const bleThermometerAdapter: NormalizerAdapter<BleRawPayload | Uint8Array
       if (payload.patientRef) patientRef = payload.patientRef;
       if (payload.deviceId) deviceId = payload.deviceId;
       if (payload.timestamp) fallbackTimestamp = payload.timestamp;
+      timezoneOffsetMinutes = payload.timezoneOffsetMinutes;
     } else {
       rawBytes = rawInput as Uint8Array | number[] | string;
     }
@@ -56,9 +65,9 @@ export const bleThermometerAdapter: NormalizerAdapter<BleRawPayload | Uint8Array
     const temperature = parseFloat32(view, offset);
     offset += 4;
 
-    let timestamp = fallbackTimestamp;
+    let timestamp: string | undefined = fallbackTimestamp;
     if (hasTimestamp && offset + 7 <= view.byteLength) {
-      const dt = parseBleDateTime(view, offset);
+      const dt = parseBleDateTime(view, offset, timezoneOffsetMinutes);
       timestamp = dt.iso;
       offset += dt.bytesRead;
     }
@@ -75,11 +84,13 @@ export const bleThermometerAdapter: NormalizerAdapter<BleRawPayload | Uint8Array
     };
     if (tempType) metadata.temperatureType = tempType;
 
+    const normalized = normalizeScalarUnit("temperature", temperature, unit);
     return {
       deviceType: "temperature",
-      value: temperature,
-      unit,
-      timestamp,
+      value: normalized.value,
+      unit: normalized.unit,
+      timestamp: requireTimestamp(timestamp, options),
+      timezoneOffsetMinutes,
       patientRef,
       deviceId,
       metadata,

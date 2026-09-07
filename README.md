@@ -1,8 +1,8 @@
 # @peerbits/device-normalizer
 
-> Normalizes raw device/health-platform payloads (Bluetooth GATT health profiles, Apple HealthKit, generic JSON) into canonical vital readings for `fhir-observation-generator`.
+> Normalizes raw device and health-platform payloads into canonical vital readings for `fhir-observation-generator`.
 
-**Category:** RPM — Device & Observation Utilities · **License:** Apache-2.0 · **Status:** Stable
+**Category:** RPM — Device & Observation Utilities · **License:** Apache-2.0 · **Status:** v2 development
 
 [![CI](https://github.com/PeerbitsSolution/device-normalizer/actions/workflows/ci.yml/badge.svg)](https://github.com/PeerbitsSolution/device-normalizer/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
@@ -16,7 +16,7 @@ Remote Patient Monitoring (RPM) applications receive vital signs in disparate fo
 
 `@peerbits/device-normalizer` decodes and standardizes pre-retrieved payloads from publicly documented standards into canonical `DeviceReading` structures that seamlessly feed [`@peerbits/fhir-observation-generator`](https://github.com/PeerbitsSolution/fhir-observation-generator) to produce compliant FHIR R4 Observations.
 
-> **Scope note:** Normalizes already-decoded payloads from publicly documented standards only (Bluetooth SIG GATT health profiles, Apple HealthKit's public schema, generic JSON). See [Supported Formats](./docs/SUPPORTED_FORMATS.md) for full details.
+> **Scope note:** Normalizes already-received payloads from publicly documented sources only. It does not connect to devices or vendor clouds. See [Supported Formats](./docs/SUPPORTED_FORMATS.md).
 
 ---
 
@@ -28,8 +28,12 @@ Remote Patient Monitoring (RPM) applications receive vital signs in disparate fo
   - **Pulse Oximeter Profile** (`0x2A5E` / `0x2A5F`): SpO2 (%) and Pulse Rate (bpm).
   - **Weight Scale Profile** (`0x2A98`): SI (kg) / Imperial (lbs) resolutions, BMI, height.
   - **Glucose Profile** (`0x2A18`): Sequence number, timestamp offset, mg/dL & mmol/L units, sample type/location.
-- **Apple HealthKit Normalizer**: Parses 7 vital sample types plus paired Blood Pressure correlation records.
-- **Generic JSON Fallback**: Standardizes flat JSON vital readings.
+  - **CGM Profile** (`0x2AA7`): Session-relative records, trend, quality, status, and E2E CRC.
+- **Platform & aggregator adapters**: Apple HealthKit, Health Connect, Junction/Vital, Tenovi, Validic, Withings, iHealth, and Dexcom EGV.
+- **Generic JSON Fallback**: Standardizes documented flat JSON vital readings.
+- **Automatic Detection**: `process(payload)` selects a supported adapter from structural fingerprints.
+- **Health Connect & Junction**: Handles core Health Connect records and Junction timeseries webhooks.
+- **Reliable Missing Data Rules**: Never invents timestamps, patient identifiers, or measurement values.
 - **Structural Self-Check**: Verifies normalized readings strictly satisfy `@peerbits/fhir-observation-generator` schema requirements before pipeline handoff.
 - **Zero Runtime Dependencies**: Pure TypeScript with no external network or BLE stack requirements.
 
@@ -50,25 +54,28 @@ npm install @peerbits/device-normalizer
 
 
 ```ts
-import { normalize } from "@peerbits/device-normalizer";
+import { process } from "@peerbits/device-normalizer";
 
 // 1. Raw Bluetooth SIG GATT characteristic bytes (0x2A35 Blood Pressure)
 const gattPayload = {
   bytes: "00 78 00 50 00 5D 00", // 120/80 mmHg with MAP 93 mmHg
+  characteristicUuid: "0x2A35",
+  timestamp: "2026-08-17T12:00:00Z",
   patientRef: "Patient/p-12345",
   deviceId: "Device/omron-evolv-001",
 };
 
-const reading = normalize("ble-gatt-blood-pressure", gattPayload);
+const reading = process(gattPayload);
 
 console.log(reading);
 // {
 //   deviceType: "blood-pressure",
 //   value: { systolic: 120, diastolic: 80 },
-//   unit: "mmHg",
+//   unit: "mm[Hg]",
 //   timestamp: "2026-08-17T12:00:00.000Z",
 //   patientRef: "Patient/p-12345",
 //   deviceId: "Device/omron-evolv-001",
+//   source: { provider: "bluetooth-sig", format: "ble-gatt-blood-pressure", ... },
 //   metadata: { bleProfile: "0x2A35", meanArterialPressure: 93 }
 // }
 ```
@@ -105,8 +112,15 @@ src/
 │   │   ├── pulse-oximeter.ts  # 0x2A5E/0x2A5F Pulse Oximeter Profile
 │   │   ├── weight-scale.ts    # 0x2A98 Weight Scale Profile
 │   │   └── glucose.ts         # 0x2A18 Glucose Measurement Profile
-│   ├── healthkit.ts           # Apple HealthKit 7 sample types + BP correlation
-│   └── generic-json.ts        # Universal flat JSON fallback
+│   ├── healthkit.ts           # Apple HealthKit samples + BP correlation
+│   ├── health-connect.ts      # Google Health Connect records
+│   ├── junction.ts            # Junction/Vital events
+│   ├── tenovi.ts              # Tenovi HWI webhooks
+│   ├── validic.ts             # Validic measurements
+│   ├── withings.ts            # Withings getmeas responses
+│   ├── ihealth.ts             # iHealth BP webhooks
+│   ├── dexcom.ts              # Dexcom EGV responses
+│   └── generic-json.ts        # Flat JSON fallback
 ├── registry.ts                # Adapter registry and dispatcher
 ├── validate.ts                # Structural self-check for fhir-observation-generator
 ├── types.ts                   # Core TypeScript types (DeviceReading local copy)
@@ -125,11 +139,11 @@ See [`/docs/examples`](./docs/examples) for:
 
 ## 8. Roadmap
 
-- [x] 5 Core Bluetooth SIG GATT Health Profiles
+- [x] 7 Core Bluetooth SIG GATT Health Profiles
 - [x] Apple HealthKit 7 vital sample types & BP correlation
 - [x] Generic JSON fallback adapter
+- [x] Publicly documented platform, aggregator, and OEM payload adapters
 - [x] Structural self-check validator
-- [ ] Additional publicly documented GATT profiles (Continuous Glucose CGM 0x2AA7)
 
 ---
 

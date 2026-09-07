@@ -16,7 +16,7 @@ describe("device-normalizer: HealthKit adapter", () => {
       systolic: 118,
       diastolic: 78,
     });
-    expect(reading.unit).toBe("mmHg");
+    expect(reading.unit).toBe("mm[Hg]");
     expect(reading.patientRef).toBe("Patient/synthetic-p-101");
     expect(reading.deviceId).toBe("Device/apple-watch-s9-001");
   });
@@ -66,7 +66,7 @@ describe("device-normalizer: HealthKit adapter", () => {
 
     expect(results[0].deviceType).toBe("heart-rate");
     expect(results[0].value).toBe(72);
-    expect(results[0].unit).toBe("bpm");
+    expect(results[0].unit).toBe("/min");
 
     expect(results[1].deviceType).toBe("glucose");
     expect(results[1].value).toBe(105);
@@ -78,8 +78,8 @@ describe("device-normalizer: HealthKit adapter", () => {
     expect(results[2].unit).toBe("%");
 
     expect(results[3].deviceType).toBe("temperature");
-    expect(results[3].value).toBe(98.4);
-    expect(results[3].unit).toBe("degF");
+    expect(results[3].value).toBe(36.8889);
+    expect(results[3].unit).toBe("Cel");
 
     expect(results[4].deviceType).toBe("weight");
     expect(results[4].value).toBe(68.5);

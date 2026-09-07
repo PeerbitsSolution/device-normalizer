@@ -10,6 +10,7 @@ import {
 } from "../src/index.js";
 
 describe("device-normalizer: adversarial edge cases & stress tests", () => {
+  const receipt = { receivedAt: "2026-08-15T10:00:00Z" };
   describe("1. Poisoned, Corrupt & Truncated Payloads", () => {
     it("safely rejects non-object / non-byte payloads", () => {
       expect(() => normalize("ble-gatt-blood-pressure", null)).toThrow(/Invalid payload/);
@@ -89,15 +90,15 @@ describe("device-normalizer: adversarial edge cases & stress tests", () => {
       // User ID: 42 (0x2A)
       // Status: 0x0001
       const fullHex = "1F A0 F0 6B F0 7D F0 EA 07 08 0F 0E 1E 00 4B 00 2A 01 00";
-      const reading = normalize("ble-gatt-blood-pressure", { bytes: fullHex }) as DeviceReading;
+      const reading = normalize("ble-gatt-blood-pressure", { bytes: fullHex, timezoneOffsetMinutes: 0 }) as DeviceReading;
       const value = reading.value as BloodPressureValue;
       const metadata = reading.metadata as Record<string, number>;
 
       expect(reading.deviceType).toBe("blood-pressure");
-      expect(reading.unit).toBe("kPa");
-      expect(value.systolic).toBe(16);
-      expect(value.diastolic).toBe(10.7);
-      expect(metadata.meanArterialPressure).toBe(12.5);
+      expect(reading.unit).toBe("mm[Hg]");
+      expect(value.systolic).toBe(120.01);
+      expect(value.diastolic).toBe(80.26);
+      expect(metadata.meanArterialPressure).toBe(93.76);
       expect(metadata.pulseRate).toBe(75);
       expect(metadata.userId).toBe(42);
       expect(metadata.measurementStatus).toBe(1);
@@ -111,7 +112,7 @@ describe("device-normalizer: adversarial edge cases & stress tests", () => {
         // Temp: 37.0 degC (72 01 00 FF)
         // Type: t
         const hex = `04 72 01 00 FF 0${t}`;
-        const reading = normalize("ble-gatt-thermometer", { bytes: hex }) as DeviceReading;
+        const reading = normalize("ble-gatt-thermometer", { bytes: hex }, receipt) as DeviceReading;
         expect(reading.deviceType).toBe("temperature");
         expect((reading.metadata as Record<string, string>).temperatureType).toBe(typeNames[t - 1]);
       }
@@ -124,11 +125,11 @@ describe("device-normalizer: adversarial edge cases & stress tests", () => {
       // Time Offset: -30 minutes (INT16: -30 = 0xFFE2 -> E2 FF)
       // Concentration: 0.0055 mol/L -> 5.5 mmol/L (0xF037 -> 37 F0)
       const hex = "03 05 00 EA 07 08 0F 0A 00 00 E2 FF 37 F0";
-      const reading = normalize("ble-gatt-glucose", { bytes: hex }) as DeviceReading;
+      const reading = normalize("ble-gatt-glucose", { bytes: hex, timezoneOffsetMinutes: 0 }) as DeviceReading;
 
       expect(reading.deviceType).toBe("glucose");
-      expect(reading.unit).toBe("mmol/L");
-      expect(reading.value).toBe(5.5);
+      expect(reading.unit).toBe("mg/dL");
+      expect(reading.value).toBe(99.1);
       // Adjusted timestamp from 10:00 minus 30 mins -> 09:30
       expect(reading.timestamp).toBe("2026-08-15T09:30:00.000Z");
     });
@@ -155,7 +156,7 @@ describe("device-normalizer: adversarial edge cases & stress tests", () => {
           { sampleType: "HKQuantityTypeIdentifierBloodPressureSystolic", value: 120 },
         ],
       };
-      expect(() => normalize("healthkit", incompleteCorrelation)).toThrow(/requires both systolic and diastolic/);
+      expect(() => normalize("healthkit", incompleteCorrelation, receipt)).toThrow(/requires both systolic and diastolic/);
     });
   });
 
@@ -165,6 +166,7 @@ describe("device-normalizer: adversarial edge cases & stress tests", () => {
         deviceType: "blood-pressure",
         rawValue: "125/85",
         rawUnit: "mmHg",
+        timestamp: "2026-08-15T10:00:00Z",
       };
       const res = normalize("generic-json", payload) as DeviceReading;
       expect(res.deviceType).toBe("blood-pressure");
@@ -173,7 +175,7 @@ describe("device-normalizer: adversarial edge cases & stress tests", () => {
 
     it("rejects generic JSON missing deviceType or with bad numeric values", () => {
       expect(() => normalize("generic-json", { value: 123 })).toThrow(/missing required 'deviceType'/);
-      expect(() => normalize("generic-json", { deviceType: "heart-rate", rawValue: "invalid-number" })).toThrow(/Invalid numeric value/);
+      expect(() => normalize("generic-json", { deviceType: "heart-rate", rawValue: "invalid-number" }, receipt)).toThrow(/Invalid numeric value/);
     });
   });
 
@@ -188,7 +190,7 @@ describe("device-normalizer: adversarial edge cases & stress tests", () => {
       };
       const res1 = validateDeviceReading(badBp);
       expect(res1.valid).toBe(false);
-      expect(res1.errors[0]).toContain("Suspicious blood pressure values");
+      expect(res1.errors).toEqual(expect.arrayContaining([expect.stringContaining("Suspicious blood pressure values")]));
 
       const badDate = {
         deviceType: "heart-rate",
@@ -199,7 +201,7 @@ describe("device-normalizer: adversarial edge cases & stress tests", () => {
       };
       const res2 = validateDeviceReading(badDate);
       expect(res2.valid).toBe(false);
-      expect(res2.errors[0]).toContain("Invalid timestamp format");
+      expect(res2.errors).toEqual(expect.arrayContaining([expect.stringContaining("Invalid timestamp format")]));
     });
   });
 });

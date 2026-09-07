@@ -4,7 +4,9 @@
  * Grounded in Bluetooth SIG Weight Scale Profile Specification (v1.0).
  */
 
-import { DeviceReading, NormalizerAdapter, NormalizerOptions, BleRawPayload } from "../../types.js";
+import { AdapterReading, NormalizerAdapter, NormalizerOptions, BleRawPayload } from "../../types.js";
+import { requireTimestamp } from "../../helpers.js";
+import { normalizeScalarUnit } from "../../units.js";
 import { payloadToDataView, parseBleDateTime } from "./sfloat.js";
 
 export const bleWeightScaleAdapter: NormalizerAdapter<BleRawPayload | Uint8Array | number[] | string> = {
@@ -12,11 +14,17 @@ export const bleWeightScaleAdapter: NormalizerAdapter<BleRawPayload | Uint8Array
   displayName: "Bluetooth SIG Weight Scale Profile (0x2A98)",
   description: "Decodes GATT Weight Measurement characteristic into canonical weight DeviceReading",
 
-  normalize(rawInput, options?: NormalizerOptions): DeviceReading {
+  detect(payload) {
+    if (!payload || typeof payload !== "object" || !("characteristicUuid" in payload)) return null;
+    const uuid = String((payload as { characteristicUuid?: unknown }).characteristicUuid).toLowerCase().replace(/^0x/, "");
+    return uuid === "2a98" ? { format: this.format, provider: "bluetooth-sig", confidence: 1, transmissionType: "bluetooth", reason: "Weight characteristic UUID" } : null;
+  },
+  normalize(rawInput, options?: NormalizerOptions): AdapterReading {
     let rawBytes: Uint8Array | number[] | string;
-    let patientRef = options?.defaultPatientRef || "Patient/unknown";
+    let patientRef = options?.defaultPatientRef;
     let deviceId = options?.defaultDeviceId;
-    let fallbackTimestamp = new Date().toISOString();
+    let fallbackTimestamp = options?.receivedAt;
+    let timezoneOffsetMinutes: number | undefined;
 
     if (typeof rawInput === "object" && rawInput !== null && "bytes" in rawInput) {
       const payload = rawInput as BleRawPayload;
@@ -24,6 +32,7 @@ export const bleWeightScaleAdapter: NormalizerAdapter<BleRawPayload | Uint8Array
       if (payload.patientRef) patientRef = payload.patientRef;
       if (payload.deviceId) deviceId = payload.deviceId;
       if (payload.timestamp) fallbackTimestamp = payload.timestamp;
+      timezoneOffsetMinutes = payload.timezoneOffsetMinutes;
     } else {
       rawBytes = rawInput as Uint8Array | number[] | string;
     }
@@ -48,9 +57,9 @@ export const bleWeightScaleAdapter: NormalizerAdapter<BleRawPayload | Uint8Array
     const weight = Math.round(rawWeight * resolution * 100) / 100;
 
     let offset = 3;
-    let timestamp = fallbackTimestamp;
+    let timestamp: string | undefined = fallbackTimestamp;
     if (hasTimestamp && offset + 7 <= view.byteLength) {
-      const dt = parseBleDateTime(view, offset);
+      const dt = parseBleDateTime(view, offset, timezoneOffsetMinutes);
       timestamp = dt.iso;
       offset += dt.bytesRead;
     }
@@ -78,11 +87,13 @@ export const bleWeightScaleAdapter: NormalizerAdapter<BleRawPayload | Uint8Array
     if (bmi !== undefined) metadata.bmi = Math.round(bmi * 10) / 10;
     if (height !== undefined) metadata.height = Math.round(height * 100) / 100;
 
+    const normalized = normalizeScalarUnit("weight", weight, unit);
     return {
       deviceType: "weight",
-      value: weight,
-      unit,
-      timestamp,
+      value: normalized.value,
+      unit: normalized.unit,
+      timestamp: requireTimestamp(timestamp, options),
+      timezoneOffsetMinutes,
       patientRef,
       deviceId,
       metadata,
